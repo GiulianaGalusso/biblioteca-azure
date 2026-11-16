@@ -1,0 +1,150 @@
+# Pipeline de BibliotecaV1 (plan F1, costo cero)
+#
+# Cada push a main pasa por cuatro etapas:
+#   1. Pruebas: verificaciones simples del HTML. Si fallan, se corta acá.
+#   2. Despliegue en staging: la versión nueva va a la Web App BibliotecaV1-staging.
+#      Producción no cambia (desplegar sin liberar).
+#   3. Smoke test: se pide la página a staging y se verifica que responda este commit.
+#   4. Aprobación manual y liberación: el job "Liberar en producción" usa el
+#      environment "produccion", que tiene revisores requeridos. Espera a que una
+#      persona apruebe en GitHub y recién ahí despliega el MISMO paquete en producción.
+#
+# Las dos Web Apps están en el mismo plan F1, así que no consumen crédito de Azure.
+
+name: Pipeline BibliotecaV1
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+# Si llegan dos pushes juntos, el segundo espera a que termine el primero.
+concurrency:
+  group: pipeline-biblioteca
+  cancel-in-progress: false
+
+env:
+  APP_PRODUCCION: BibliotecaV1
+  APP_STAGING: BibliotecaV1-staging
+
+jobs:
+  pruebas:
+    name: Pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Verificar la página
+        run: |
+          test -s index.html                      || { echo "Falta index.html"; exit 1; }
+          grep -qi '<!doctype html>' index.html   || { echo "Falta el doctype"; exit 1; }
+          grep -q '<title>' index.html            || { echo "Falta el título"; exit 1; }
+          grep -q 'Versión [0-9]' index.html      || { echo "Falta el número de versión"; exit 1; }
+          grep -q '</html>' index.html            || { echo "La página está cortada"; exit 1; }
+          echo "Pruebas OK"
+
+      - name: Armar el paquete (con el commit a la vista)
+        run: |
+          mkdir sitio
+          COMMIT="${GITHUB_SHA::7}"
+          sed "s#</main>#<p><small>Commit ${COMMIT}</small></p></main>#" index.html > sitio/index.html
+          grep -q "Commit ${COMMIT}" sitio/index.html
+
+      - name: Guardar el paquete
+        uses: actions/upload-artifact@v4
+        with:
+          name: sitio
+          path: sitio
+
+  staging:
+    name: Desplegar en staging
+    needs: pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bajar el paquete
+        uses: actions/download-artifact@v4
+        with:
+          name: sitio
+          path: sitio
+
+      - name: Iniciar sesión en Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_7A60EFE2355347D098D1123002E92244 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_753BFB9455B447FA89B01D87E9E308B2 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_98FEAC19DE914432AB9CF3372C9F3B7F }}
+
+      - name: Desplegar en staging
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.APP_STAGING }}
+          package: ./sitio
+
+      - name: Smoke test contra staging
+        run: |
+          URL="${{ steps.deploy.outputs.webapp-url }}"
+          COMMIT="${GITHUB_SHA::7}"
+          echo "Probando $URL"
+          # F1 apaga la app si no se usa: la primera respuesta puede tardar.
+          for i in $(seq 1 18); do
+            if curl -s --max-time 20 "$URL" | grep -q "Commit ${COMMIT}"; then
+              echo "Staging responde el commit ${COMMIT}"
+              exit 0
+            fi
+            echo "Todavía no (intento $i), espero 10 s"
+            sleep 10
+          done
+          echo "Staging no respondió con este commit: se corta acá y producción no se toca"
+          exit 1
+
+  produccion:
+    name: Liberar en producción
+    needs: staging
+    runs-on: ubuntu-latest
+    # El environment "produccion" tiene revisores requeridos:
+    # este job no arranca hasta que una persona apruebe en GitHub.
+    environment:
+      name: produccion
+      url: ${{ steps.deploy.outputs.webapp-url }}
+    steps:
+      - name: Bajar el paquete
+        uses: actions/download-artifact@v4
+        with:
+          name: sitio
+          path: sitio
+
+      - name: Iniciar sesión en Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_7A60EFE2355347D098D1123002E92244 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_753BFB9455B447FA89B01D87E9E308B2 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_98FEAC19DE914432AB9CF3372C9F3B7F }}
+
+      - name: Desplegar en producción
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.APP_PRODUCCION }}
+          package: ./sitio
+
+      - name: Smoke test contra producción
+        run: |
+          URL="${{ steps.deploy.outputs.webapp-url }}"
+          COMMIT="${GITHUB_SHA::7}"
+          for i in $(seq 1 18); do
+            if curl -s --max-time 20 "$URL" | grep -q "Commit ${COMMIT}"; then
+              echo "Producción responde el commit ${COMMIT}"
+              exit 0
+            fi
+            echo "Todavía no (intento $i), espero 10 s"
+            sleep 10
+          done
+          echo "Producción no respondió con este commit: revisar y volver atrás"
+          exit 1
