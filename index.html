@@ -5,16 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Biblioteca del Barrio</title>
 <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; background: #eef4fa; color: #142a43; font-family: system-ui, sans-serif; }
-    main { max-width: 880px; margin: 9vh auto; padding: 48px; background: white; border-radius: 20px; }
-    .intro { color: #175bb6; font-weight: 700; letter-spacing: .08em; }
-    h1 { font-size: clamp(32px, 6vw, 58px); line-height: 1.08; margin: 24px 0; }
-    p { font-size: 20px; line-height: 1.6; }
-    .horario { margin: 36px 0; padding: 24px 0; border-top: 2px solid #dae5f0; border-bottom: 2px solid #dae5f0; }
-    .horario strong { display: block; margin-top: 12px; font-size: clamp(30px, 5vw, 48px); }
-    small { color: #52667a; }
-    @media (max-width: 600px) { main { margin: 20px; padding: 28px; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: #e3f6e8; color: #142a43; font-family: system-
+ui, sans-serif; }
+main { max-width: 880px; margin: 9vh auto; padding: 48px; background:
+white; border-radius: 20px; }
+.intro { color: #1b7a3a; font-weight: 700; letter-spacing: .08em; }
+h1 { font-size: clamp(32px, 6vw, 58px); line-height: 1.08; margin: 24px 0; }
+p { font-size: 20px; line-height: 1.6; }
+.horario { margin: 36px 0; padding: 24px 0; border-top: 2px solid #dae5f0;
+border-bottom: 2px solid #dae5f0; }
+.horario strong { display: block; margin-top: 12px; font-size: clamp(30px,
+5vw, 48px); }
+small { color: #52667a; }
+.nuevo { display: inline-block; margin-top: 8px; padding: 6px 14px;
+background: #1b7a3a; color: white; border-radius: 999px; font-weight: 700; }
+@media (max-width: 600px) { main { margin: 20px; padding: 28px; } }
 </style>
 </head>
 <body>
@@ -23,11 +29,15 @@
 <h1>Un lugar para descubrir tu próxima lectura.</h1>
 <p>Consultá nuestros horarios y acercate a disfrutar de la biblioteca.</p>
 <section class="horario" aria-label="Horario de atención">
-      Lunes a viernes
+Lunes a viernes
 <strong>09:00 a 20:00</strong>
+Sábados
+<strong>10:00 a 14:00</strong>
+<span class="nuevo">Nuevo: abrimos los sábados</span>
 </section>
 <p>Te esperamos para leer, estudiar y compartir.</p>
-<small>Versión 2 · Ejemplo ficticio para una demostración de despliegue.</small>
+<small>Versión 3 · Ejemplo ficticio para una demostración de despliegue.</
+small>
 </main>
 </body>
 </html>
